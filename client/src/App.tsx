@@ -29,7 +29,7 @@ const MenuIcon: FC = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Title, Tooltip, Legend);
 
 // --- API Configuration ---
-const API_URL = 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const api = axios.create({ baseURL: API_URL });
 
 api.interceptors.request.use(config => {
