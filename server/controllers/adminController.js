@@ -1,4 +1,4 @@
-const User = require('../models/User');
+const User = require('../models/user');
 const File = require('../models/File');
 
 // @desc    Get all users (for admin)
