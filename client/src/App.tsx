@@ -1,17 +1,11 @@
 import React, { useState, useEffect, useRef, createContext, useContext, FC, ReactNode } from 'react';
 import axios, { AxiosError } from 'axios';
 import { Bar, Line, Pie, Doughnut } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, ChartData, ChartTypeRegistry } from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, ChartData, type ChartTypeRegistry } from 'chart.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-
-// Add a declaration for the SheetJS library loaded from CDN
-declare global {
-    interface Window {
-        XLSX: unknown;
-    }
-}
+import * as XLSX from 'xlsx';
 
 // --- Icons ---
 const UploadIcon: FC = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>;
@@ -22,7 +16,9 @@ const ChartIcon: FC = () => <svg xmlns="http://www.w3.org/2000/svg" className="h
 const AnalyticsIcon: FC = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>;
 const FileManagerIcon: FC = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>;
 const DeleteIcon: FC = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
-const MenuIcon: FC = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
+const MenuIcon: FC = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>;
+const GoogleIcon: FC = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C12.955 4 4 12.955 4 24s8.955 20 20 20s20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A8 8 0 0 1 24 36c-5.222 0-9.641-3.669-11.28-8.584l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.574l6.19 5.238C42.032 35.127 44 30.023 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>;
+const AppleIcon: FC = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24"><path fill="currentColor" d="M15.22 6.095a2.64 2.64 0 0 0-2.31-1.423a2.64 2.64 0 0 0-2.31 1.423c-1.028.02-2.318 1.044-2.318 2.864c0 1.554 1.14 2.228 2.273 2.228c1.028 0 1.5-.724 2.364-.724c.863 0 1.295.724 2.318.724c1.14 0 2.273-.674 2.273-2.228c0-1.82-1.29-2.844-2.318-2.864m-2.738-2.43a.44.44 0 0 1-.437.342a.44.44 0 0 1-.436-.342a1.5 1.5 0 0 1 1.309-1.282a.439.439 0 0 1 .48.512a1.49 1.49 0 0 1-.916.77M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10s10-4.477 10-10S17.523 2 12 2m2.318 16.545c-.772.27-1.545.27-2.318 0c-2.318-.814-3.863-3.4-3.863-6.273c0-3.359 2.045-5.38 4.045-5.38c.924 0 1.834.618 2.5.618s1.614-.664 2.772-.664c2.046 0 4.046 2.067 4.046 5.426c0 2.227-.864 4.886-2.546 6.136c-.863.63-1.818.86-2.636.86c-.727 0-1.409-.224-2.136-.72Z"/></svg>;
 
 
 // --- Chart.js Setup ---
@@ -41,11 +37,14 @@ api.interceptors.request.use(config => {
 // --- Type Definitions ---
 type ExcelRow = Record<string, string | number>;
 type CustomChartType = keyof ChartTypeRegistry | '3dbar';
+
 interface SavedChart {
-    id: number;
+    _id: string;
     title: string;
-    type: CustomChartType;
+    chartType: CustomChartType;
     data: ChartData;
+    options?: unknown;
+    savedAt: string;
 }
 interface FileType {
     _id: string;
@@ -55,8 +54,6 @@ interface FileType {
 interface User { _id: string; name: string; email: string; isAdmin: boolean; }
 interface AuthState { token: string | null; isAuthenticated: boolean | null; loading: boolean; user: User | null; }
 interface AppState {
-    savedCharts: SavedChart[];
-    addChart: (chart: Omit<SavedChart, 'id'>) => void;
     currentData: { data: ExcelRow[], columns: string[] } | null;
     setCurrentData: (data: { data: ExcelRow[], columns:string[] } | null) => void;
 }
@@ -66,14 +63,8 @@ interface NavigateFunc { (path: string): void; }
 const AppContext = createContext<AppState | undefined>(undefined);
 
 const AppProvider: FC<{children: ReactNode}> = ({ children }) => {
-    const [savedCharts, setSavedCharts] = useState<SavedChart[]>([]);
     const [currentData, setCurrentData] = useState<{ data: ExcelRow[], columns: string[] } | null>(null);
-
-    const addChart = (chart: Omit<SavedChart, 'id'>) => {
-        setSavedCharts(prev => [...prev, { ...chart, id: Date.now() }]);
-    };
-
-    return <AppContext.Provider value={{ savedCharts, addChart, currentData, setCurrentData }}>{children}</AppContext.Provider>;
+    return <AppContext.Provider value={{ currentData, setCurrentData }}>{children}</AppContext.Provider>;
 };
 const useAppContext = () => {
     const context = useContext(AppContext);
@@ -99,7 +90,7 @@ const AuthProvider: FC<{children: ReactNode}> = ({ children }) => {
           const res = await api.get('/auth');
           setAuth({ token: localStorage.token, isAuthenticated: true, loading: false, user: res.data });
         } catch (err) {
-          console.error(err);
+          console.error("Failed to load user:", err);
           localStorage.removeItem('token');
           setAuth({ token: null, isAuthenticated: false, loading: false, user: null });
         }
@@ -191,7 +182,7 @@ const LoginPage: FC<{navigate: NavigateFunc}> = ({ navigate }) => {
     setError('');
     setLoading(true);
     try { await login(email, password); } 
-    catch (err) {
+    catch (err: unknown) {
         if (err instanceof AxiosError) {
             setError(err.response?.data?.msg || 'Login failed.');
         } else {
@@ -202,9 +193,15 @@ const LoginPage: FC<{navigate: NavigateFunc}> = ({ navigate }) => {
     }
   };
 
+    const handleOAuthLogin = (provider: 'google' | 'apple') => {
+      // In a real app, this would redirect to the backend OAuth endpoint
+      // e.g., window.location.href = `${API_URL}/auth/${provider}`;
+      alert(`Login with ${provider} is not implemented in this demo.`);
+  };
+
   return (
     <motion.div key="login" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="flex items-center justify-center min-h-screen">
-      <div className="w-full max-w-md p-8 space-y-8 bg-slate-800 rounded-2xl shadow-2xl">
+      <div className="w-full max-w-md p-8 space-y-6 bg-slate-800 rounded-2xl shadow-2xl">
         <div className="text-center">
             <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">Welcome Back</h1>
             <p className="mt-2 text-slate-400">Sign in to unlock your data's potential.</p>
@@ -215,6 +212,20 @@ const LoginPage: FC<{navigate: NavigateFunc}> = ({ navigate }) => {
           <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
           <motion.button type="submit" disabled={loading} className="w-full py-3 font-semibold text-white bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg shadow-lg hover:shadow-xl transition-all disabled:opacity-50">{loading ? 'Logging in...' : 'Login'}</motion.button>
         </form>
+        <div className="relative flex items-center">
+            <div className="flex-grow border-t border-slate-600"></div>
+            <span className="flex-shrink mx-4 text-slate-400 text-sm">OR CONTINUE WITH</span>
+            <div className="flex-grow border-t border-slate-600"></div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+            <motion.button onClick={() => handleOAuthLogin('google')} whileHover={{scale: 1.05}} whileTap={{scale: 0.95}} className="flex items-center justify-center w-full py-3 font-semibold text-white bg-slate-700 hover:bg-slate-600 rounded-lg">
+                <GoogleIcon /> <span className="ml-2">Google</span>
+            </motion.button>
+            <motion.button onClick={() => handleOAuthLogin('apple')} whileHover={{scale: 1.05}} whileTap={{scale: 0.95}} className="flex items-center justify-center w-full py-3 font-semibold text-white bg-slate-700 hover:bg-slate-600 rounded-lg">
+                <AppleIcon /> <span className="ml-2">Apple</span>
+            </motion.button>
+        </div>
+
         <p className="text-center text-slate-400">No account? <button onClick={() => navigate('register')} className="font-medium text-blue-400 hover:underline">Create one</button></p>
       </div>
     </motion.div>
@@ -234,7 +245,7 @@ const RegisterPage: FC<{navigate: NavigateFunc}> = ({ navigate }) => {
         setError('');
         setLoading(true);
         try { await register(name, email, password); } 
-        catch (err) { 
+        catch (err: unknown) { 
             if (err instanceof AxiosError) {
                 setError(err.response?.data?.msg || 'Registration failed.');
             } else {
@@ -244,10 +255,14 @@ const RegisterPage: FC<{navigate: NavigateFunc}> = ({ navigate }) => {
             setLoading(false); 
         }
     };
+    
+    const handleOAuthLogin = (provider: 'google' | 'apple') => {
+        alert(`Sign up with ${provider} is not implemented in this demo.`);
+    };
 
     return (
         <motion.div key="register" initial={{ opacity: 0, x: 100 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -100 }} className="flex items-center justify-center min-h-screen">
-            <div className="w-full max-w-md p-8 space-y-8 bg-slate-800 rounded-2xl shadow-2xl">
+            <div className="w-full max-w-md p-8 space-y-6 bg-slate-800 rounded-2xl shadow-2xl">
                 <div className="text-center">
                     <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-teal-500">Create Account</h1>
                     <p className="mt-2 text-slate-400">Join and start visualizing.</p>
@@ -259,9 +274,25 @@ const RegisterPage: FC<{navigate: NavigateFunc}> = ({ navigate }) => {
                     <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
                     <motion.button type="submit" disabled={loading} className="w-full py-3 font-semibold text-white bg-gradient-to-r from-green-500 to-teal-600 rounded-lg shadow-lg hover:shadow-xl transition-all disabled:opacity-50">{loading ? 'Creating Account...' : 'Register'}</motion.button>
                 </form>
-                <p className="text-center text-slate-400">Already have an account? <button onClick={() => navigate('login')} className="font-medium text-green-400 hover:underline">Log In</button></p>
-            </div>
-        </motion.div>
+
+                 <div className="relative flex items-center">
+                    <div className="flex-grow border-t border-slate-600"></div>
+                    <span className="flex-shrink mx-4 text-slate-400 text-sm">OR SIGN UP WITH</span>
+                    <div className="flex-grow border-t border-slate-600"></div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <motion.button onClick={() => handleOAuthLogin('google')} whileHover={{scale: 1.05}} whileTap={{scale: 0.95}} className="flex items-center justify-center w-full py-3 font-semibold text-white bg-slate-700 hover:bg-slate-600 rounded-lg">
+                        <GoogleIcon /> <span className="ml-2">Google</span>
+                    </motion.button>
+                    <motion.button onClick={() => handleOAuthLogin('apple')} whileHover={{scale: 1.05}} whileTap={{scale: 0.95}} className="flex items-center justify-center w-full py-3 font-semibold text-white bg-slate-700 hover:bg-slate-600 rounded-lg">
+                        <AppleIcon /> <span className="ml-2">Apple</span>
+                    </motion.button>
+                </div>
+
+              <p className="text-center text-slate-400">Already have an account? <button onClick={() => navigate('login')} className="font-medium text-green-400 hover:underline">Log In</button></p>
+          </div>
+      </motion.div>
     );
 };
 
@@ -270,7 +301,7 @@ const DashboardLayout: FC<{navigate: NavigateFunc, page: string}> = ({ navigate,
     const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const renderContent = () => {
-        const pageName = user?.isAdmin ? page.split('/')[1] || 'dashboard' : page;
+        const pageName = user?.isAdmin && page.startsWith('admin/') ? page.split('/')[1] : page;
         switch(pageName) {
             case 'dashboard': return <Dashboard navigate={navigate} />;
             case 'upload': return <UploadPage />;
@@ -310,7 +341,7 @@ const Sidebar: FC<{navigate: NavigateFunc, page: string, user: User | null, logo
       <div className={`fixed md:relative inset-y-0 left-0 z-30 w-64 bg-slate-800 p-6 flex-col justify-between shadow-2xl flex transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
         <div>
             <div className="mb-10 flex items-center"><h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">Excel Analytics</h2></div>
-            <nav><ul>{navItems.map(item => (<li key={item.path} className="mb-2"><button onClick={() => navigate(item.path)} className={`w-full text-left flex items-center p-3 rounded-lg transition-colors ${ page.includes(item.path.split('/')[0]) ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700' }`}>{item.icon} <span className="ml-3">{item.name}</span></button></li>))}</ul></nav>
+            <nav><ul>{navItems.map(item => (<li key={item.path} className="mb-2"><button onClick={() => navigate(item.path)} className={`w-full text-left flex items-center p-3 rounded-lg transition-colors ${ page === item.path ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700' }`}>{item.icon} <span className="ml-3">{item.name}</span></button></li>))}</ul></nav>
         </div>
         <div><motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={logout} className="w-full py-2 font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg">Logout</motion.button></div>
       </div>
@@ -329,19 +360,21 @@ const StatCardV2: FC<{title:string, value:string|number, percentage:number, icon
 
 const Dashboard: FC<{navigate: NavigateFunc}> = ({ navigate }) => {
     const { user } = useAuth();
-    const { savedCharts } = useAppContext();
-    const [stats, setStats] = useState({ files: 0, storage: '0MB' });
+    const [stats, setStats] = useState({ files: 0, storage: '0MB', charts: 0 });
     const [recentFiles, setRecentFiles] = useState<FileType[]>([]);
 
     useEffect(() => {
-        const fetchHistory = async () => {
+        const fetchData = async () => {
             try {
-                const res = await api.get('/files/history');
-                setStats({ files: res.data.length, storage: '0MB' }); // Placeholder for storage
-                setRecentFiles(res.data.slice(0, 5));
+                const [filesRes, chartsRes] = await Promise.all([
+                    api.get('/files/history'),
+                    api.get('/charts')
+                ]);
+                setStats({ files: filesRes.data.length, storage: '0MB', charts: chartsRes.data.length });
+                setRecentFiles(filesRes.data.slice(0, 5));
             } catch (err) { console.error(err); }
         };
-        fetchHistory();
+        fetchData();
     }, []);
 
     return (
@@ -350,7 +383,7 @@ const Dashboard: FC<{navigate: NavigateFunc}> = ({ navigate }) => {
             <p className="text-slate-400 mb-8">Here's what's happening with your data analytics today.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <StatCardV2 title="Total Files" value={stats.files} percentage={12} icon={<FileManagerIcon/>} color="bg-blue-500/20 text-blue-300"/>
-                <StatCardV2 title="Charts Created" value={savedCharts.length} percentage={8} icon={<ChartIcon/>} color="bg-green-500/20 text-green-300"/>
+                <StatCardV2 title="Charts Saved" value={stats.charts} percentage={8} icon={<ChartIcon/>} color="bg-green-500/20 text-green-300"/>
                 <StatCardV2 title="Data Points" value="0" percentage={15} icon={<AnalyticsIcon/>} color="bg-purple-500/20 text-purple-300"/>
                 <StatCardV2 title="Storage Used" value={stats.storage} percentage={3} icon={<UploadIcon/>} color="bg-orange-500/20 text-orange-300"/>
             </div>
@@ -361,14 +394,14 @@ const Dashboard: FC<{navigate: NavigateFunc}> = ({ navigate }) => {
                 </div>
                 <div className="lg:col-span-2 bg-slate-800 p-6 rounded-xl shadow-lg">
                     <div className="flex justify-between items-center mb-4"><h2 className="text-xl font-semibold">Recent Charts</h2><button onClick={() => navigate('charts')} className="text-sm text-blue-400 hover:underline">View all</button></div>
-                    <p className="text-slate-400 text-center py-8">No charts created yet.</p>
+                    <p className="text-slate-400 text-center py-8">No charts saved to your account yet.</p>
                 </div>
             </div>
              <div className="bg-slate-800 p-6 rounded-xl shadow-lg">
                 <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <button onClick={() => navigate('upload')} className="p-4 bg-slate-700/50 hover:bg-slate-700 rounded-lg transition-colors text-left"><h3 className="font-bold text-blue-400">Upload File</h3><p className="text-sm text-slate-400">Add new Excel file</p></button>
-                    <button onClick={() => navigate('charts')} className="p-4 bg-slate-700/50 hover:bg-slate-700 rounded-lg transition-colors text-left"><h3 className="font-bold text-green-400">Create Chart</h3><p className="text-sm text-slate-400">Visualize your data</p></button>
+                    <button onClick={() => navigate('upload')} className="p-4 bg-slate-700/50 hover:bg-slate-700 rounded-lg transition-colors text-left"><h3 className="font-bold text-green-400">Create Chart</h3><p className="text-sm text-slate-400">Visualize your data</p></button>
                     <button onClick={() => navigate('analytics')} className="p-4 bg-slate-700/50 hover:bg-slate-700 rounded-lg transition-colors text-left"><h3 className="font-bold text-purple-400">View Analytics</h3><p className="text-sm text-slate-400">Data insights</p></button>
                 </div>
             </div>
@@ -377,13 +410,14 @@ const Dashboard: FC<{navigate: NavigateFunc}> = ({ navigate }) => {
 };
 
 const UploadPage: FC = () => {
-    const { addChart, setCurrentData } = useAppContext();
+    const { setCurrentData } = useAppContext();
     const [file, setFile] = useState<File | null>(null);
     const [excelData, setExcelData] = useState<ExcelRow[] | null>(null);
     const [columns, setColumns] = useState<string[]>([]);
     const [xAxis, setXAxis] = useState('');
     const [yAxis, setYAxis] = useState('');
     const [chartType, setChartType] = useState<CustomChartType>('bar');
+    const [chartTitle, setChartTitle] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [uploadSuccess, setUploadSuccess] = useState('');
@@ -407,29 +441,34 @@ const UploadPage: FC = () => {
         formData.append('excelFile', file);
 
         try {
-            const res = await api.post('/files/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+            const res = await api.post<{fileName: string}>('/files/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
             setUploadSuccess(`File '${res.data.fileName}' uploaded! Now parsing...`);
             
             const reader = new FileReader();
             reader.onload = (event) => {
-                // @ts-expect-error - TypeScript can't resolve URL imports, but this works at runtime.
-                import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs').then(XLSX => {
-                    const workbook = XLSX.read(event.target?.result, { type: 'binary' });
+                try {
+                    const data = new Uint8Array(event.target?.result as ArrayBuffer);
+                    const workbook = XLSX.read(data, { type: 'array' });
                     const sheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[sheetName];
-                    const data: ExcelRow[] = XLSX.utils.sheet_to_json(worksheet);
-                    setExcelData(data);
-                    setCurrentData({data, columns: Object.keys(data[0] || {})});
-                    if (data.length > 0) {
-                        const fileColumns = Object.keys(data[0]);
+                    const jsonData: ExcelRow[] = XLSX.utils.sheet_to_json(worksheet);
+                    
+                    setExcelData(jsonData);
+                    setCurrentData({data: jsonData, columns: Object.keys(jsonData[0] || {})});
+                    if (jsonData.length > 0) {
+                        const fileColumns = Object.keys(jsonData[0]);
                         setColumns(fileColumns);
                         setXAxis(fileColumns[0]);
                         setYAxis(fileColumns.length > 1 ? fileColumns[1] : fileColumns[0]);
+                        setChartTitle(`${fileColumns.length > 1 ? fileColumns[1] : fileColumns[0]} by ${fileColumns[0]}`);
                     }
-                });
+                } catch (err: unknown) {
+                    console.error("Error parsing Excel file:", err);
+                    setError("Failed to parse the Excel file.");
+                }
             };
-            reader.readAsBinaryString(file);
-        } catch (err) { 
+            reader.readAsArrayBuffer(file);
+        } catch (err: unknown) { 
             if (err instanceof AxiosError) {
                 setError(err.response?.data?.msg || 'File upload failed.');
             } else {
@@ -439,10 +478,15 @@ const UploadPage: FC = () => {
         finally { setLoading(false); }
     };
 
-    const handleSaveChart = () => {
-        const chartConfig = { title: `${yAxis} by ${xAxis}`, type: chartType, data: chartData };
-        addChart(chartConfig);
-        alert('Chart saved! View it on the Charts page.');
+    const handleSaveChart = async () => {
+        const chartConfig = { title: chartTitle, chartType: chartType, data: chartData };
+        try {
+            await api.post('/charts', chartConfig);
+            alert('Chart saved! View it on the Charts page.');
+        } catch(err: unknown) {
+            console.error(err);
+            alert('Failed to save chart.');
+        }
     };
     
     const chartData: ChartData = {
@@ -466,10 +510,11 @@ const UploadPage: FC = () => {
                     {excelData && (
                     <div className="bg-slate-800 p-6 rounded-xl shadow-lg mt-8">
                         <h2 className="text-xl font-semibold mb-4 text-blue-400">2. Configure Chart</h2>
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <div className="space-y-4">
+                            <div><label className="block mb-2 text-sm font-medium text-slate-300">Chart Title</label><input type="text" value={chartTitle} onChange={e => setChartTitle(e.target.value)} className="w-full p-2 bg-slate-700 rounded-md"/></div>
                             <div><label className="block mb-2 text-sm font-medium text-slate-300">X-Axis (Labels)</label><select value={xAxis} onChange={e => setXAxis(e.target.value)} className="w-full p-2 bg-slate-700 rounded-md">{columns.map(col => <option key={col} value={col}>{col}</option>)}</select></div>
                             <div><label className="block mb-2 text-sm font-medium text-slate-300">Y-Axis (Values)</label><select value={yAxis} onChange={e => setYAxis(e.target.value)} className="w-full p-2 bg-slate-700 rounded-md">{columns.map(col => <option key={col} value={col}>{col}</option>)}</select></div>
-                            <div className="col-span-full"><label className="block mb-2 text-sm font-medium text-slate-300">Chart Type</label><select value={chartType} onChange={e => setChartType(e.target.value as CustomChartType)} className="w-full p-2 bg-slate-700 rounded-md"><option value="bar">Bar Chart</option> <option value="line">Line Chart</option> <option value="pie">Pie Chart</option> <option value="doughnut">Doughnut Chart</option> <option value="3dbar">3D Bar Chart</option></select></div>
+                            <div><label className="block mb-2 text-sm font-medium text-slate-300">Chart Type</label><select value={chartType} onChange={e => setChartType(e.target.value as CustomChartType)} className="w-full p-2 bg-slate-700 rounded-md"><option value="bar">Bar Chart</option> <option value="line">Line Chart</option> <option value="pie">Pie Chart</option> <option value="doughnut">Doughnut Chart</option> <option value="3dbar">3D Bar Chart</option></select></div>
                         </div>
                         <button onClick={handleSaveChart} className="mt-4 w-full py-2 font-semibold text-white bg-green-600 rounded-lg">Save Chart</button>
                     </div>
@@ -496,21 +541,38 @@ const UploadPage: FC = () => {
 };
 
 const ChartsPage: FC = () => {
-    const { savedCharts } = useAppContext();
+    const [savedCharts, setSavedCharts] = useState<SavedChart[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchCharts = async () => {
+            try {
+                const res = await api.get('/charts');
+                setSavedCharts(res.data);
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchCharts();
+    }, []);
+
+    if (loading) return <div>Loading charts...</div>;
+
     return (
         <div>
             <h1 className="text-3xl font-bold mb-8">Saved Charts</h1>
-            {savedCharts.length === 0 ? (<p className="text-slate-400">You haven't saved any charts yet. Go to the 'Upload Files' page to create and save one.</p>) : (
+            {savedCharts.length === 0 ? (<p className="text-slate-400">You haven't saved any charts yet. Go to the 'Upload' page to create and save one.</p>) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     {savedCharts.map(chart => (
-                        <div key={chart.id} className="bg-slate-800 p-6 rounded-xl">
+                        <div key={chart._id} className="bg-slate-800 p-6 rounded-xl">
                             <h3 className="font-semibold mb-4">{chart.title}</h3>
                             <div className="h-64 bg-slate-900 p-2 rounded-lg">
-                                {chart.type === 'bar' && <Bar data={chart.data as ChartData<'bar'>} options={{ maintainAspectRatio: false, plugins: { legend: { labels: { color: 'white' } } }, scales: { x: { ticks: { color: 'white' } }, y: { ticks: { color: 'white' } } } }} />}
-                                {chart.type === 'line' && <Line data={chart.data as ChartData<'line'>} options={{ maintainAspectRatio: false, plugins: { legend: { labels: { color: 'white' } } }, scales: { x: { ticks: { color: 'white' } }, y: { ticks: { color: 'white' } } } }} />}
-                                {chart.type === 'pie' && <Pie data={chart.data as ChartData<'pie'>} options={{ maintainAspectRatio: false, plugins: { legend: { labels: { color: 'white' } } } }} />}
-                                {chart.type === 'doughnut' && <Doughnut data={chart.data as ChartData<'doughnut'>} options={{ maintainAspectRatio: false, plugins: { legend: { labels: { color: 'white' } } } }} />}
-                                {chart.type === '3dbar' && <div className="text-white flex items-center justify-center h-full">3D Preview Not Available Here</div>}
+                                {chart.chartType === 'bar' && <Bar data={chart.data as ChartData<'bar'>} options={{ maintainAspectRatio: false, plugins: { legend: { labels: { color: 'white' } } }, scales: { x: { ticks: { color: 'white' } }, y: { ticks: { color: 'white' } } } }} />}
+                                {chart.chartType === 'line' && <Line data={chart.data as ChartData<'line'>} options={{ maintainAspectRatio: false, plugins: { legend: { labels: { color: 'white' } } }, scales: { x: { ticks: { color: 'white' } }, y: { ticks: { color: 'white' } } } }} />}
+                                {chart.chartType === 'pie' && <Pie data={chart.data as ChartData<'pie'>} options={{ maintainAspectRatio: false, plugins: { legend: { labels: { color: 'white' } } } }} />}
+                                {chart.chartType === 'doughnut' && <Doughnut data={chart.data as ChartData<'doughnut'>} options={{ maintainAspectRatio: false, plugins: { legend: { labels: { color: 'white' } } } }} />}
                             </div>
                         </div>
                     ))}
@@ -555,7 +617,7 @@ const AnalyticsPage: FC = () => {
     }, [currentData, column]);
 
     if (!currentData) {
-        return <p className="text-slate-400">Please upload a file on the 'Upload Files' page to see analytics.</p>;
+        return <p className="text-slate-400">Please upload a file on the 'Upload & Analyze' page to generate analytics.</p>;
     }
 
     return (
@@ -591,7 +653,7 @@ const FileManagerPage: FC = () => {
 
     const fetchFiles = async () => {
         try { const res = await api.get('/files/history'); setFiles(res.data); } 
-        catch (err) { console.error(err); } 
+        catch (err: unknown) { console.error(err); } 
         finally { setLoading(false); }
     };
 
@@ -642,7 +704,41 @@ const FileManagerPage: FC = () => {
     );
 };
 
-const UserManagementPage: FC = () => <div className="text-slate-400">User Management feature coming soon.</div>;
+const UserManagementPage: FC = () => {
+    const [users, setUsers] = useState<User[]>([]);
+    useEffect(() => {
+        const fetchUsers = async () => {
+            try {
+                const res = await api.get('/admin/users');
+                setUsers(res.data);
+            } catch (err) {
+                console.error("Failed to fetch users", err);
+            }
+        };
+        fetchUsers();
+    }, []);
+    return (
+         <div>
+            <h1 className="text-3xl font-bold mb-8">User Management</h1>
+            <div className="bg-slate-800 rounded-xl shadow-lg overflow-x-auto">
+                <table className="w-full text-left">
+                    <thead className="border-b border-slate-700">
+                        <tr><th className="p-4">Name</th><th className="p-4">Email</th><th className="p-4">Admin Status</th></tr>
+                    </thead>
+                    <tbody>
+                        {users.map(user => (
+                            <tr key={user._id} className="border-b border-slate-700">
+                                <td className="p-4">{user.name}</td>
+                                <td className="p-4">{user.email}</td>
+                                <td className="p-4">{user.isAdmin ? 'Admin' : 'User'}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
 
 const SettingsPage: FC = () => {
     const { user } = useAuth();
@@ -709,8 +805,8 @@ const ThreeDChart: FC<{data: ChartData}> = ({ data }) => {
           const handleResize = () => { if (currentMount && renderer) { camera.aspect = currentMount.clientWidth / currentMount.clientHeight; camera.updateProjectionMatrix(); renderer.setSize(currentMount.clientWidth, currentMount.clientHeight); } };
           window.addEventListener('resize', handleResize);
  
-          cleanup = () => { window.removeEventListener('resize', handleResize); cancelAnimationFrame(animationFrameId); if (renderer && currentMount && renderer.domElement) { try { currentMount.removeChild(renderer.domElement); } catch (err) { console.error("Error removing renderer dom element:", err); } } };
-        } catch (error) { console.error("Failed to load Three.js modules:", error); if (currentMount) { currentMount.innerHTML = '<div class="flex items-center justify-center h-full text-red-400">Error loading 3D chart.</div>'; } }
+          cleanup = () => { window.removeEventListener('resize', handleResize); cancelAnimationFrame(animationFrameId); if (renderer && currentMount && renderer.domElement) { try { currentMount.removeChild(renderer.domElement); } catch (err: unknown) { console.error("Error removing renderer dom element:", err); } } };
+        } catch (error: unknown) { console.error("Failed to load Three.js modules:", error); if (currentMount) { currentMount.innerHTML = '<div class="flex items-center justify-center h-full text-red-400">Error loading 3D chart.</div>'; } }
       };
       init();
       return () => cleanup();

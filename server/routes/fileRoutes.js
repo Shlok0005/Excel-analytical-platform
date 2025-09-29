@@ -1,17 +1,19 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const fileController = require('../controllers/fileController');
 const authMiddleware = require('../middleware/authMiddleware');
-const uploadMiddleware = require('../middleware/uploadMiddleware');
 
-// @route   POST api/files/upload
-// @desc    Upload an excel file
-// @access  Private
-router.post('/upload', [authMiddleware, uploadMiddleware], fileController.uploadFile);
+const upload = multer({ dest: 'uploads/' });
 
-// @route   GET api/files/history
-// @desc    Get user's file upload history
-// @access  Private
-router.get('/history', authMiddleware, fileController.getFileHistory);
+router.post(
+  '/upload',
+  [authMiddleware, upload.single('excelFile')],
+  fileController.uploadFile
+);
+
+router.get('/history', authMiddleware, fileController.getHistory);
+
+router.delete('/:id', authMiddleware, fileController.deleteFile);
 
 module.exports = router;
